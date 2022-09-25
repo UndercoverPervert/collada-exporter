@@ -125,7 +125,7 @@ class DaeExporter:
             for t in self.uv:
                 tup = tup + (t.x, t.y)
             if self.color is not None:
-                tup = tup + (self.color.x, self.color.y, self.color.z)
+                tup = tup + (self.color.x, self.color.y, self.color.z, self.color.w)
             if self.tangent is not None:
                 tup = tup + (self.tangent.x, self.tangent.y, self.tangent.z)
             if self.bitangent is not None:
@@ -617,7 +617,7 @@ class DaeExporter:
         if (custom_name is not None and custom_name != ""):
             name_to_use = custom_name
 
-        mesh = node.to_mesh(preserve_all_data_layers=False, depsgraph=bpy.context.evaluated_depsgraph_get()) 
+        mesh:bpy.types.Mesh = node.to_mesh(preserve_all_data_layers=False, depsgraph=bpy.context.evaluated_depsgraph_get()) 
         # 2.8 update: warning, Blender does not support anymore the "RENDER" argument to apply modifier
         # with render state, only current state
         
@@ -655,7 +655,8 @@ class DaeExporter:
         # TODO: Implement automatic tangent detection
         has_tangents = self.config["use_tangent_arrays"]
 
-        has_colors = len(mesh.vertex_colors)
+        #has_colors = len(mesh.vertex_colors)
+        has_colors = len(mesh.color_attributes)
         mat_assign = []
 
         uv_layer_count = len(mesh.uv_layers)
@@ -697,8 +698,8 @@ class DaeExporter:
 
             for lt in range(f.loop_total):
                 loop_index = f.loop_start + lt
-                ml = mesh.loops[loop_index]
-                mv = mesh.vertices[ml.vertex_index]
+                ml:bpy.types.MeshLoop = mesh.loops[loop_index]
+                mv:bpy.types.MeshVertex = mesh.vertices[ml.vertex_index]
 
                 v = self.Vertex()
                 v.vertex = Vector(mv.co)
@@ -707,14 +708,16 @@ class DaeExporter:
                     v.uv.append(Vector(xt.data[loop_index].uv))
 
                 if (has_colors):
-                    v.color = Vector(
-                        mesh.vertex_colors[0].data[loop_index].color)
+                    #v.color = Vector(mesh.vertex_colors[0].data[loop_index].color) # deprecated
+                    v.color = Vector(mesh.color_attributes[0].data[loop_index].color)
 
                 v.normal = Vector(ml.normal)
 
                 if (has_tangents):
                     v.tangent = Vector(ml.tangent)
                     v.bitangent = Vector(ml.bitangent)
+                    if (ml.bitangent_sign < 0): # flip bitangents back
+                        v.bitangent = v.bitangent * ml.bitangent_sign
 
                 if armature is not None:
                     wsum = 0.0
@@ -771,7 +774,7 @@ class DaeExporter:
         self.writel(S_GEOM, 3, "<source id=\"{}-positions\">".format(meshid))
         float_values = ""
         for v in vertices:
-            float_values += " {} {} {}".format(
+            float_values += " {:.8f} {:.8f} {:.8f}".format(
                 v.vertex.x, v.vertex.y, v.vertex.z)
         self.writel(
             S_GEOM, 4, "<float_array id=\"{}-positions-array\" "
@@ -792,7 +795,7 @@ class DaeExporter:
         self.writel(S_GEOM, 3, "<source id=\"{}-normals\">".format(meshid))
         float_values = ""
         for v in vertices:
-            float_values += " {} {} {}".format(
+            float_values += " {:.8f} {:.8f} {:.8f}".format(
                 v.normal.x, v.normal.y, v.normal.z)
         self.writel(
             S_GEOM, 4, "<float_array id=\"{}-normals-array\" "
@@ -814,7 +817,7 @@ class DaeExporter:
                 S_GEOM, 3, "<source id=\"{}-tangents\">".format(meshid))
             float_values = ""
             for v in vertices:
-                float_values += " {} {} {}".format(
+                float_values += " {:.8f} {:.8f} {:.8f}".format(
                     v.tangent.x, v.tangent.y, v.tangent.z)
             self.writel(
                 S_GEOM, 4, "<float_array id=\"{}-tangents-array\" "
@@ -835,7 +838,7 @@ class DaeExporter:
                 meshid))
             float_values = ""
             for v in vertices:
-                float_values += " {} {} {}".format(
+                float_values += " {:.8f} {:.8f} {:.8f}".format(
                     v.bitangent.x, v.bitangent.y, v.bitangent.z)
             self.writel(
                 S_GEOM, 4, "<float_array id=\"{}-bitangents-array\" "
@@ -859,7 +862,7 @@ class DaeExporter:
             float_values = ""
             for v in vertices:
                 try:
-                    float_values += " {} {}".format(v.uv[uvi].x, v.uv[uvi].y)
+                    float_values += " {:.8f} {:.8f}".format(v.uv[uvi].x, v.uv[uvi].y)
                 except:
                     # TODO: Review, understand better the multi-uv-layer API
                     float_values += " 0 0 "
@@ -884,19 +887,20 @@ class DaeExporter:
             self.writel(S_GEOM, 3, "<source id=\"{}-colors\">".format(meshid))
             float_values = ""
             for v in vertices:
-                float_values += " {} {} {}".format(
-                    v.color.x, v.color.y, v.color.z)
+                float_values += " {:.8f} {:.8f} {:.8f} {:.8f}".format(
+                    v.color.x, v.color.y, v.color.z, v.color.w)
             self.writel(
                 S_GEOM, 4, "<float_array id=\"{}-colors-array\" "
                 "count=\"{}\">{}</float_array>".format(
-                    meshid, len(vertices) * 3, float_values))
+                    meshid, len(vertices) * 4, float_values))
             self.writel(S_GEOM, 4, "<technique_common>")
             self.writel(
                 S_GEOM, 4, "<accessor source=\"#{}-colors-array\" "
-                "count=\"{}\" stride=\"3\">".format(meshid, len(vertices)))
-            self.writel(S_GEOM, 5, "<param name=\"X\" type=\"float\"/>")
-            self.writel(S_GEOM, 5, "<param name=\"Y\" type=\"float\"/>")
-            self.writel(S_GEOM, 5, "<param name=\"Z\" type=\"float\"/>")
+                "count=\"{}\" stride=\"4\">".format(meshid, len(vertices)))
+            self.writel(S_GEOM, 5, "<param name=\"R\" type=\"float\"/>")
+            self.writel(S_GEOM, 5, "<param name=\"G\" type=\"float\"/>")
+            self.writel(S_GEOM, 5, "<param name=\"B\" type=\"float\"/>")
+            self.writel(S_GEOM, 5, "<param name=\"A\" type=\"float\"/>")
             self.writel(S_GEOM, 4, "</accessor>")
             self.writel(S_GEOM, 4, "</technique_common>")
             self.writel(S_GEOM, 3, "</source>")
@@ -1187,10 +1191,10 @@ class DaeExporter:
             is_ctrl_bone = False
 
         if (is_ctrl_bone is False):
-            boneid = self.new_id("bone")
+            boneid = bone.name
             boneidx = si["bone_count"]
             si["bone_count"] += 1
-            bonesid = "{}-{}".format(si["id"], boneidx)
+            bonesid = bone.name
             if (bone.name in self.used_bones):
                 if (self.config["use_anim_action_all"]):
                     self.operator.report(
@@ -1241,7 +1245,7 @@ class DaeExporter:
         armature = node.data
         self.skeleton_info[node] = {
             "bone_count": 0,
-            "id": self.new_id("skelbones"),
+            "sid": node.name,
             "name": node.name,
             "bone_index": {},
             "bone_ids": {},

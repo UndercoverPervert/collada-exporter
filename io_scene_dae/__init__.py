@@ -21,8 +21,8 @@ from bpy.props import StringProperty, BoolProperty, FloatProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 bl_info = {
     "name": "Better Collada Exporter",
-    "author": "Juan Linietsky, artell, Panthavma",
-    "version": (1, 10, 11),
+    "author": "Juan Linietsky, artell, Panthavma, UndercoverPervert",
+    "version": (1, 11, 0),
     "blender": (3, 0, 1),
     "api": 38691,
     "location": "File > Import-Export",
@@ -30,7 +30,7 @@ bl_info = {
                     "Otherwise contact the Godot Engine community."),
     "warning": "",
     "wiki_url": ("https://godotengine.org"),
-    "tracker_url": "https://github.com/godotengine/collada-exporter",
+    "tracker_url": "https://github.com/UndercoverPervert/collada-exporter",
     "support": "OFFICIAL",
     "category": "Import-Export"}
 
@@ -85,12 +85,12 @@ class CE_OT_export_dae(bpy.types.Operator, ExportHelper):
         name="Tangent Arrays",
         description="Export Tangent and Binormal arrays "
                     "(for normalmapping).",
-        default=False,
+        default=True,
         )
     use_triangles : BoolProperty(
         name="Triangulate",
         description="Export Triangles instead of Polygons.",
-        default=False,
+        default=True,
         )
 
     use_copy_images : BoolProperty(
@@ -101,7 +101,7 @@ class CE_OT_export_dae(bpy.types.Operator, ExportHelper):
     use_active_layers : BoolProperty(
         name="Active Layers",
         description="Export only objects on the active layers.",
-        default=True,
+        default=False,
         )
     use_exclude_ctrl_bones : BoolProperty(
         name="Exclude Control Bones",
